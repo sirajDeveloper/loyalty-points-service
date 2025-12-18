@@ -14,16 +14,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	userserviceusecase "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/application/usecase"
-	userservicehandler "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/presentation/handler"
 	userservicebootstrap "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/bootstrap"
+	userservicehandler "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/presentation/handler"
 
 	gophermartusecase "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/application/usecase"
-	gophermarthandler "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/handler"
-	gophermartmiddleware "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/middleware"
 	gophermartbootstrap "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/bootstrap"
+	gophermartservice "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/service"
 	gophermartpostgres "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/infrastructure/datastorage/postgres"
 	gophermarthttpclient "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/infrastructure/httpclient"
-	gophermartservice "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/service"
+	gophermarthandler "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/handler"
+	gophermartmiddleware "github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/middleware"
 
 	userservicepostgres "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/infrastructure/datastorage/postgres"
 	userservicejwt "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/infrastructure/jwt"
@@ -67,13 +67,14 @@ func main() {
 	balanceRepo := gophermartpostgres.NewBalanceRepository(pool)
 	withdrawalRepo := gophermartpostgres.NewWithdrawalRepository(pool)
 	outboxRepo := gophermartpostgres.NewOutboxRepository(pool)
+	unitOfWork := gophermartpostgres.NewUnitOfWork(pool)
 	accrualClient := gophermarthttpclient.NewAccrualClient(cfg.AccrualSystemAddress)
 	luhnValidator := gophermartservice.NewLuhnValidator()
 
-	uploadOrderUseCase := gophermartusecase.NewUploadOrderUseCase(pool, orderRepo, outboxRepo, luhnValidator)
+	uploadOrderUseCase := gophermartusecase.NewUploadOrderUseCase(unitOfWork, orderRepo, outboxRepo, luhnValidator)
 	getOrdersUseCase := gophermartusecase.NewGetOrdersUseCase(orderRepo)
 	getBalanceUseCase := gophermartusecase.NewGetBalanceUseCase(balanceRepo)
-	withdrawUseCase := gophermartusecase.NewWithdrawUseCase(pool, balanceRepo, withdrawalRepo, luhnValidator)
+	withdrawUseCase := gophermartusecase.NewWithdrawUseCase(unitOfWork, balanceRepo, withdrawalRepo, luhnValidator)
 	getWithdrawalsUseCase := gophermartusecase.NewGetWithdrawalsUseCase(withdrawalRepo)
 	processOrdersUseCase := gophermartusecase.NewProcessOrdersUseCase(outboxRepo, orderRepo, balanceRepo, accrualClient)
 

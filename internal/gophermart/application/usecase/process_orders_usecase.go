@@ -5,15 +5,16 @@ import (
 	"errors"
 	"log"
 	"time"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/model"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/service"
 )
 
 type ProcessOrdersUseCase struct {
-	outboxRepo    repository.OutboxRepository
-	orderRepo     repository.OrderRepository
-	balanceRepo   repository.BalanceRepository
+	outboxRepo     repository.OutboxRepository
+	orderRepo      repository.OrderRepository
+	balanceRepo    repository.BalanceRepository
 	accrualService service.AccrualService
 }
 
@@ -24,8 +25,8 @@ func NewProcessOrdersUseCase(
 	accrualService service.AccrualService,
 ) *ProcessOrdersUseCase {
 	return &ProcessOrdersUseCase{
-		outboxRepo:    outboxRepo,
-		orderRepo:     orderRepo,
+		outboxRepo:     outboxRepo,
+		orderRepo:      orderRepo,
 		balanceRepo:    balanceRepo,
 		accrualService: accrualService,
 	}
@@ -74,11 +75,14 @@ func (uc *ProcessOrdersUseCase) processOrder(ctx context.Context, outbox *model.
 		return errors.New("order not found")
 	}
 
-	accrualResp, err := uc.accrualService.GetOrderInfo(ctx, order.Number)
+	accrualResp, err := uc.accrualService.GetOrderInfo(ctx, order.Number())
 	if err != nil {
 		if err.Error() == "rate limited" || err.Error() == "order not found in accrual system" {
 			if err.Error() == "order not found in accrual system" {
-				if updateErr := uc.orderRepo.UpdateStatus(ctx, order.ID, model.OrderStatusInvalid, nil); updateErr != nil {
+				if updateErr := order.UpdateStatus(model.OrderStatusInvalid, nil); updateErr != nil {
+					return updateErr
+				}
+				if updateErr := uc.orderRepo.UpdateStatus(ctx, order.ID(), model.OrderStatusInvalid, nil); updateErr != nil {
 					return updateErr
 				}
 				return nil
@@ -99,7 +103,7 @@ func (uc *ProcessOrdersUseCase) processOrder(ctx context.Context, outbox *model.
 	case "PROCESSED":
 		newStatus = model.OrderStatusProcessed
 		if accrualResp.Accrual != nil {
-			if err := uc.balanceRepo.Accrue(ctx, order.UserID, *accrualResp.Accrual); err != nil {
+			if err := uc.balanceRepo.Accrue(ctx, order.UserID(), *accrualResp.Accrual); err != nil {
 				return err
 			}
 		}
@@ -107,7 +111,11 @@ func (uc *ProcessOrdersUseCase) processOrder(ctx context.Context, outbox *model.
 		return errors.New("unknown accrual status")
 	}
 
-	if err := uc.orderRepo.UpdateStatus(ctx, order.ID, newStatus, accrualResp.Accrual); err != nil {
+	if err := order.UpdateStatus(newStatus, accrualResp.Accrual); err != nil {
+		return err
+	}
+
+	if err := uc.orderRepo.UpdateStatus(ctx, order.ID(), newStatus, accrualResp.Accrual); err != nil {
 		return err
 	}
 
@@ -129,4 +137,3 @@ func (uc *ProcessOrdersUseCase) StartWorker(ctx context.Context, interval time.D
 		}
 	}
 }
-

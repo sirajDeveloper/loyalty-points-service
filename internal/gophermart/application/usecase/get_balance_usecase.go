@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 )
 
@@ -31,9 +32,7 @@ func (uc *GetBalanceUseCase) Execute(ctx context.Context, req GetBalanceRequest)
 	}
 
 	return &GetBalanceResponse{
-		Current:   balance.Current,
-		Withdrawn: balance.Withdrawn,
+		Current:   balance.Current(),
+		Withdrawn: balance.Withdrawn(),
 	}, nil
 }
-
-

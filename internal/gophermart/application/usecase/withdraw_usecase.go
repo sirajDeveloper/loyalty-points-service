@@ -3,28 +3,27 @@ package usecase
 import (
 	"context"
 	"errors"
-	"time"
-	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/model"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/service"
 )
 
 type WithdrawUseCase struct {
-	pool            *pgxpool.Pool
-	balanceRepo     repository.BalanceRepository
-	withdrawalRepo  repository.WithdrawalRepository
-	luhnValidator   *service.LuhnValidator
+	unitOfWork     repository.UnitOfWork
+	balanceRepo    repository.BalanceRepository
+	withdrawalRepo repository.WithdrawalRepository
+	luhnValidator  *service.LuhnValidator
 }
 
 func NewWithdrawUseCase(
-	pool *pgxpool.Pool,
+	unitOfWork repository.UnitOfWork,
 	balanceRepo repository.BalanceRepository,
 	withdrawalRepo repository.WithdrawalRepository,
 	luhnValidator *service.LuhnValidator,
 ) *WithdrawUseCase {
 	return &WithdrawUseCase{
-		pool:           pool,
+		unitOfWork:     unitOfWork,
 		balanceRepo:    balanceRepo,
 		withdrawalRepo: withdrawalRepo,
 		luhnValidator:  luhnValidator,
@@ -32,9 +31,9 @@ func NewWithdrawUseCase(
 }
 
 type WithdrawRequest struct {
-	UserID     int64
-	Order      string
-	Sum        float64
+	UserID int64
+	Order  string
+	Sum    float64
 }
 
 type WithdrawResponse struct {
@@ -51,36 +50,28 @@ func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*W
 		return nil, err
 	}
 
-	if balance.Current < req.Sum {
+	if !balance.CanWithdraw(req.Sum) {
 		return nil, errors.New("insufficient funds")
 	}
 
-	tx, err := uc.pool.Begin(ctx)
+	tx, err := uc.unitOfWork.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	withdrawal := &model.Withdrawal{
-		UserID:      req.UserID,
-		OrderNumber: req.Order,
-		Sum:         req.Sum,
-		ProcessedAt: time.Now(),
-	}
-
-	withdrawalQuery := `INSERT INTO withdrawals (user_id, order_number, sum, processed_at) 
-	                    VALUES ($1, $2, $3, $4) RETURNING id`
-	err = tx.QueryRow(ctx, withdrawalQuery, withdrawal.UserID, withdrawal.OrderNumber, withdrawal.Sum, withdrawal.ProcessedAt).Scan(&withdrawal.ID)
+	withdrawal, err := model.NewWithdrawal(req.UserID, req.Order, req.Sum)
 	if err != nil {
 		return nil, err
 	}
 
-	balanceQuery := `INSERT INTO balances (user_id, current, withdrawn) 
-	                 VALUES ($1, -$2, $2)
-	                 ON CONFLICT (user_id) 
-	                 DO UPDATE SET current = balances.current - $2, withdrawn = balances.withdrawn + $2`
-	_, err = tx.Exec(ctx, balanceQuery, req.UserID, req.Sum)
-	if err != nil {
+	withdrawalRepo := tx.WithdrawalRepository()
+	if err := withdrawalRepo.Create(ctx, withdrawal); err != nil {
+		return nil, err
+	}
+
+	balanceRepo := tx.BalanceRepository()
+	if err := balanceRepo.Withdraw(ctx, req.UserID, req.Sum); err != nil {
 		return nil, err
 	}
 
@@ -90,5 +81,3 @@ func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*W
 
 	return &WithdrawResponse{Success: true}, nil
 }
-
-

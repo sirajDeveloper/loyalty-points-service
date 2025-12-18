@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/application/usecase"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/middleware"
 )
@@ -102,5 +103,3 @@ func (h *OrderHandler) GetList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(orders)
 }
-
-

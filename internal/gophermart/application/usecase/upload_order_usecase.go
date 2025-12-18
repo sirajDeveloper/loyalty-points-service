@@ -4,29 +4,29 @@ import (
 	"context"
 	"errors"
 	"time"
-	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/model"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/service"
 )
 
 type UploadOrderUseCase struct {
-	pool         *pgxpool.Pool
-	orderRepo    repository.OrderRepository
-	outboxRepo   repository.OutboxRepository
+	unitOfWork    repository.UnitOfWork
+	orderRepo     repository.OrderRepository
+	outboxRepo    repository.OutboxRepository
 	luhnValidator *service.LuhnValidator
 }
 
 func NewUploadOrderUseCase(
-	pool *pgxpool.Pool,
+	unitOfWork repository.UnitOfWork,
 	orderRepo repository.OrderRepository,
 	outboxRepo repository.OutboxRepository,
 	luhnValidator *service.LuhnValidator,
 ) *UploadOrderUseCase {
 	return &UploadOrderUseCase{
-		pool:         pool,
-		orderRepo:    orderRepo,
-		outboxRepo:   outboxRepo,
+		unitOfWork:    unitOfWork,
+		orderRepo:     orderRepo,
+		outboxRepo:    outboxRepo,
 		luhnValidator: luhnValidator,
 	}
 }
@@ -51,44 +51,38 @@ func (uc *UploadOrderUseCase) Execute(ctx context.Context, req UploadOrderReques
 	}
 
 	if existingOrder != nil {
-		if existingOrder.UserID == req.UserID {
+		if existingOrder.CanBeUploadedBy(req.UserID) {
 			return &UploadOrderResponse{Status: "already_uploaded"}, nil
 		}
 		return nil, errors.New("order number already exists for another user")
 	}
 
-	tx, err := uc.pool.Begin(ctx)
+	tx, err := uc.unitOfWork.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	order := &model.Order{
-		UserID:     req.UserID,
-		Number:     req.Number,
-		Status:     model.OrderStatusNew,
-		UploadedAt: time.Now(),
-	}
-
-	orderQuery := `INSERT INTO orders (user_id, number, status, accrual, uploaded_at) 
-	               VALUES ($1, $2, $3, $4, $5) RETURNING id`
-	err = tx.QueryRow(ctx, orderQuery, order.UserID, order.Number, order.Status, order.Accrual, order.UploadedAt).Scan(&order.ID)
+	order, err := model.NewOrder(req.UserID, req.Number)
 	if err != nil {
 		return nil, err
 	}
 
+	orderRepo := tx.OrderRepository()
+	if err := orderRepo.Create(ctx, order); err != nil {
+		return nil, err
+	}
+
 	outbox := &model.Outbox{
-		OrderID:   order.ID,
+		OrderID:   order.ID(),
 		Status:    model.OutboxStatusPending,
 		Retries:   0,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	outboxQuery := `INSERT INTO outbox (order_id, status, retries, created_at, updated_at) 
-	                VALUES ($1, $2, $3, $4, $5) RETURNING id`
-	err = tx.QueryRow(ctx, outboxQuery, outbox.OrderID, outbox.Status, outbox.Retries, outbox.CreatedAt, outbox.UpdatedAt).Scan(&outbox.ID)
-	if err != nil {
+	outboxRepo := tx.OutboxRepository()
+	if err := outboxRepo.Create(ctx, outbox); err != nil {
 		return nil, err
 	}
 
@@ -98,4 +92,3 @@ func (uc *UploadOrderUseCase) Execute(ctx context.Context, req UploadOrderReques
 
 	return &UploadOrderResponse{Status: "accepted"}, nil
 }
-

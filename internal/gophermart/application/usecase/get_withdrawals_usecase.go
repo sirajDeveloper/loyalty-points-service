@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"time"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 )
 
@@ -33,9 +34,9 @@ func (uc *GetWithdrawalsUseCase) Execute(ctx context.Context, req GetWithdrawals
 	response := make([]*WithdrawalResponse, 0, len(withdrawals))
 	for _, withdrawal := range withdrawals {
 		response = append(response, &WithdrawalResponse{
-			Order:       withdrawal.OrderNumber,
-			Sum:         withdrawal.Sum,
-			ProcessedAt: withdrawal.ProcessedAt,
+			Order:       withdrawal.OrderNumber(),
+			Sum:         withdrawal.Sum(),
+			ProcessedAt: withdrawal.ProcessedAt(),
 		})
 	}
 
@@ -47,4 +48,3 @@ type WithdrawalResponse struct {
 	Sum         float64   `json:"sum"`
 	ProcessedAt time.Time `json:"processed_at"`
 }
-

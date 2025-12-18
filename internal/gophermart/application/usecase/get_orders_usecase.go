@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"time"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
 )
 
@@ -33,10 +34,10 @@ func (uc *GetOrdersUseCase) Execute(ctx context.Context, req GetOrdersRequest) (
 	response := make([]*OrderResponse, 0, len(orders))
 	for _, order := range orders {
 		response = append(response, &OrderResponse{
-			Number:     order.Number,
-			Status:     string(order.Status),
-			Accrual:    order.Accrual,
-			UploadedAt: order.UploadedAt,
+			Number:     order.Number(),
+			Status:     string(order.Status()),
+			Accrual:    order.Accrual(),
+			UploadedAt: order.UploadedAt(),
 		})
 	}
 
@@ -49,4 +50,3 @@ type OrderResponse struct {
 	Accrual    *float64  `json:"accrual,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }
-
