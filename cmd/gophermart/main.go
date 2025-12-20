@@ -6,15 +6,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	userserviceusecase "github.com/sirajDeveloper/loyalty-points-service/internal/user-service/application/usecase"
@@ -48,28 +44,6 @@ func main() {
 
 	if err := pool.Ping(context.Background()); err != nil {
 		log.Fatalf("failed to ping database: %v", err)
-	}
-
-	migrationsPath := filepath.Join("migrations", "gophermart")
-	absPath, err := filepath.Abs(migrationsPath)
-	if err != nil {
-		log.Fatalf("failed to get absolute path for migrations: %v", err)
-	}
-
-	sourceURL := "file://" + absPath
-	m, err := migrate.New(sourceURL, cfg.DatabaseURI)
-	if err != nil {
-		log.Fatalf("failed to create migrate instance: %v", err)
-	}
-	defer m.Close()
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatalf("failed to run migrations: %v", err)
-	}
-	if err == migrate.ErrNoChange {
-		log.Println("database migrations: no change")
-	} else {
-		log.Println("database migrations: applied successfully")
 	}
 
 	userServiceCfg := userservicebootstrap.ConfigLoad()

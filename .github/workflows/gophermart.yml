@@ -45,10 +45,18 @@ jobs:
           mv $GITHUB_WORKSPACE/.tools/gophermarttest /usr/local/bin/gophermarttest
           mv $GITHUB_WORKSPACE/.tools/random /usr/local/bin/random
 
+      - name: Install migrate
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
       - name: Prepare binaries
         run: |
           (cd cmd/gophermart && go build -buildvcs=false -o gophermart)
           (cd cmd/accrual && chmod +x accrual_linux_amd64)
+
+      - name: Run migrations
+        run: |
+          migrate -path migrations/gophermart -database "postgresql://postgres:postgres@postgres/praktikum?sslmode=disable" up
 
       - name: Test
         run: |
