@@ -45,7 +45,14 @@ func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*W
 		return nil, errors.New("invalid order number format")
 	}
 
-	balance, err := uc.balanceRepo.GetByUserID(ctx, req.UserID)
+	tx, err := uc.unitOfWork.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	balanceRepo := tx.BalanceRepository()
+	balance, err := balanceRepo.GetByUserID(ctx, req.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,12 +60,6 @@ func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*W
 	if !balance.CanWithdraw(req.Sum) {
 		return nil, errors.New("insufficient funds")
 	}
-
-	tx, err := uc.unitOfWork.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
 
 	withdrawal, err := model.NewWithdrawal(req.UserID, req.Order, req.Sum)
 	if err != nil {
@@ -70,7 +71,6 @@ func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*W
 		return nil, err
 	}
 
-	balanceRepo := tx.BalanceRepository()
 	if err := balanceRepo.Withdraw(ctx, req.UserID, req.Sum); err != nil {
 		return nil, err
 	}

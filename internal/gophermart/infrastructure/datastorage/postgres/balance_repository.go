@@ -62,10 +62,9 @@ func (r *balanceRepositoryTx) GetByUserID(ctx context.Context, userID int64) (*m
 }
 
 func (r *balanceRepositoryTx) Withdraw(ctx context.Context, userID int64, amount float64) error {
-	query := `INSERT INTO balances (user_id, current, withdrawn) 
-	          VALUES ($1, -$2, $2)
-	          ON CONFLICT (user_id) 
-	          DO UPDATE SET current = balances.current - $2, withdrawn = balances.withdrawn + $2`
+	query := `UPDATE balances 
+	          SET current = current - $2, withdrawn = withdrawn + $2 
+	          WHERE user_id = $1`
 	_, err := r.tx.Exec(ctx, query, userID, amount)
 	return err
 }

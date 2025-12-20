@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/application/usecase"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/presentation/middleware"
 )
@@ -83,11 +85,10 @@ func (h *BalanceHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusPaymentRequired)
 			return
 		}
+		log.Printf("withdraw error: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
-
-
