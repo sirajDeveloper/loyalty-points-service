@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"flag"
 	"os"
 	"time"
 )
@@ -16,9 +15,9 @@ type Config struct {
 func ConfigLoad() *Config {
 	cfg := &Config{}
 
-	flag.StringVar(&cfg.RunAddress, "a", getEnv("RUN_ADDRESS", "localhost:8081"), "server address")
-	flag.StringVar(&cfg.DatabaseURI, "d", getEnv("DATABASE_URI", ""), "database connection string")
-	flag.StringVar(&cfg.JWTSecret, "j", getEnv("JWT_SECRET", "your-secret-key-change-in-production"), "JWT secret key")
+	cfg.RunAddress = getEnv("RUN_ADDRESS", "localhost:8081")
+	cfg.DatabaseURI = getEnv("DATABASE_URI", "")
+	cfg.JWTSecret = getEnv("JWT_SECRET", "your-secret-key-change-in-production")
 
 	expiryStr := getEnv("JWT_EXPIRY", "30m")
 	expiry, err := time.ParseDuration(expiryStr)
@@ -26,8 +25,6 @@ func ConfigLoad() *Config {
 		expiry = 30 * time.Minute
 	}
 	cfg.JWTExpiry = expiry
-
-	flag.Parse()
 
 	return cfg
 }
