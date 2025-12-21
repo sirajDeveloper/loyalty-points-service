@@ -30,18 +30,18 @@ func (r *balanceRepository) GetByUserID(ctx context.Context, userID int64) (*mod
 
 func (r *balanceRepository) Withdraw(ctx context.Context, userID int64, amount float64) error {
 	query := `INSERT INTO balances (user_id, current, withdrawn) 
-	          VALUES ($1, -$2, $2)
+	          VALUES ($1, -$2::DECIMAL(10,2), $2::DECIMAL(10,2))
 	          ON CONFLICT (user_id) 
-	          DO UPDATE SET current = balances.current - $2, withdrawn = balances.withdrawn + $2`
+	          DO UPDATE SET current = balances.current - $2::DECIMAL(10,2), withdrawn = balances.withdrawn + $2::DECIMAL(10,2)`
 	_, err := r.pool.Exec(ctx, query, userID, amount)
 	return err
 }
 
 func (r *balanceRepository) Accrue(ctx context.Context, userID int64, amount float64) error {
 	query := `INSERT INTO balances (user_id, current, withdrawn) 
-	          VALUES ($1, $2, 0)
+	          VALUES ($1, $2::DECIMAL(10,2), 0)
 	          ON CONFLICT (user_id) 
-	          DO UPDATE SET current = balances.current + $2`
+	          DO UPDATE SET current = balances.current + $2::DECIMAL(10,2)`
 	_, err := r.pool.Exec(ctx, query, userID, amount)
 	return err
 }
@@ -71,9 +71,9 @@ func (r *balanceRepositoryTx) Withdraw(ctx context.Context, userID int64, amount
 
 func (r *balanceRepositoryTx) Accrue(ctx context.Context, userID int64, amount float64) error {
 	query := `INSERT INTO balances (user_id, current, withdrawn) 
-	          VALUES ($1, $2, 0)
+	          VALUES ($1, $2::DECIMAL(10,2), 0)
 	          ON CONFLICT (user_id) 
-	          DO UPDATE SET current = balances.current + $2`
+	          DO UPDATE SET current = balances.current + $2::DECIMAL(10,2)`
 	_, err := r.tx.Exec(ctx, query, userID, amount)
 	return err
 }
