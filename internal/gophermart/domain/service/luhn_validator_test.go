@@ -10,9 +10,9 @@ func TestNewLuhnOrderNumberValidator(t *testing.T) {
 		t.Error("NewLuhnOrderNumberValidator() returned nil")
 	}
 
-	_, ok := validator.(OrderNumberValidator)
+	_, ok := validator.(*luhnOrderNumberValidator)
 	if !ok {
-		t.Error("NewLuhnOrderNumberValidator() does not return OrderNumberValidator interface")
+		t.Error("NewLuhnOrderNumberValidator() does not return *luhnOrderNumberValidator")
 	}
 }
 
