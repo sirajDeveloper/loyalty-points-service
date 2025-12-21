@@ -11,23 +11,23 @@ import (
 )
 
 type UploadOrderUseCase struct {
-	unitOfWork    repository.UnitOfWork
-	orderRepo     repository.OrderRepository
-	outboxRepo    repository.OutboxRepository
-	luhnValidator *service.LuhnValidator
+	unitOfWork     repository.UnitOfWork
+	orderRepo      repository.OrderRepository
+	outboxRepo     repository.OutboxRepository
+	orderValidator service.OrderNumberValidator
 }
 
 func NewUploadOrderUseCase(
 	unitOfWork repository.UnitOfWork,
 	orderRepo repository.OrderRepository,
 	outboxRepo repository.OutboxRepository,
-	luhnValidator *service.LuhnValidator,
+	orderValidator service.OrderNumberValidator,
 ) *UploadOrderUseCase {
 	return &UploadOrderUseCase{
-		unitOfWork:    unitOfWork,
-		orderRepo:     orderRepo,
-		outboxRepo:    outboxRepo,
-		luhnValidator: luhnValidator,
+		unitOfWork:     unitOfWork,
+		orderRepo:      orderRepo,
+		outboxRepo:     outboxRepo,
+		orderValidator: orderValidator,
 	}
 }
 
@@ -41,7 +41,7 @@ type UploadOrderResponse struct {
 }
 
 func (uc *UploadOrderUseCase) Execute(ctx context.Context, req UploadOrderRequest) (*UploadOrderResponse, error) {
-	if !uc.luhnValidator.Validate(req.Number) {
+	if !uc.orderValidator.Validate(req.Number) {
 		return nil, errors.New("invalid order number format")
 	}
 

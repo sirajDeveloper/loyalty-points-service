@@ -45,12 +45,12 @@ func (u *UseCaseInitializer) Initialize() *UseCaseResult {
 	)
 
 	accrualClient := gophermarthttpclient.NewAccrualClient(u.config.AccrualSystemAddress)
-	luhnValidator := gophermartservice.NewLuhnValidator()
+	orderValidator := gophermartservice.NewLuhnOrderNumberValidator()
 
-	uploadOrderUseCase := gophermartusecase.NewUploadOrderUseCase(u.infraResult.UnitOfWork, u.infraResult.OrderRepo, u.infraResult.OutboxRepo, luhnValidator)
+	uploadOrderUseCase := gophermartusecase.NewUploadOrderUseCase(u.infraResult.UnitOfWork, u.infraResult.OrderRepo, u.infraResult.OutboxRepo, orderValidator)
 	getOrdersUseCase := gophermartusecase.NewGetOrdersUseCase(u.infraResult.OrderRepo)
 	getBalanceUseCase := gophermartusecase.NewGetBalanceUseCase(u.infraResult.BalanceRepo)
-	withdrawUseCase := gophermartusecase.NewWithdrawUseCase(u.infraResult.UnitOfWork, u.infraResult.BalanceRepo, u.infraResult.WithdrawalRepo, luhnValidator)
+	withdrawUseCase := gophermartusecase.NewWithdrawUseCase(u.infraResult.UnitOfWork, u.infraResult.BalanceRepo, u.infraResult.WithdrawalRepo, orderValidator)
 	getWithdrawalsUseCase := gophermartusecase.NewGetWithdrawalsUseCase(u.infraResult.WithdrawalRepo)
 	processOrdersUseCase := gophermartusecase.NewProcessOrdersUseCase(u.infraResult.OutboxRepo, u.infraResult.OrderRepo, u.infraResult.BalanceRepo, accrualClient)
 

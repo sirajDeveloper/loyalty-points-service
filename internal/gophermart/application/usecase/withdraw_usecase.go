@@ -13,20 +13,20 @@ type WithdrawUseCase struct {
 	unitOfWork     repository.UnitOfWork
 	balanceRepo    repository.BalanceRepository
 	withdrawalRepo repository.WithdrawalRepository
-	luhnValidator  *service.LuhnValidator
+	orderValidator service.OrderNumberValidator
 }
 
 func NewWithdrawUseCase(
 	unitOfWork repository.UnitOfWork,
 	balanceRepo repository.BalanceRepository,
 	withdrawalRepo repository.WithdrawalRepository,
-	luhnValidator *service.LuhnValidator,
+	orderValidator service.OrderNumberValidator,
 ) *WithdrawUseCase {
 	return &WithdrawUseCase{
 		unitOfWork:     unitOfWork,
 		balanceRepo:    balanceRepo,
 		withdrawalRepo: withdrawalRepo,
-		luhnValidator:  luhnValidator,
+		orderValidator: orderValidator,
 	}
 }
 
@@ -41,7 +41,7 @@ type WithdrawResponse struct {
 }
 
 func (uc *WithdrawUseCase) Execute(ctx context.Context, req WithdrawRequest) (*WithdrawResponse, error) {
-	if !uc.luhnValidator.Validate(req.Order) {
+	if !uc.orderValidator.Validate(req.Order) {
 		return nil, errors.New("invalid order number format")
 	}
 
