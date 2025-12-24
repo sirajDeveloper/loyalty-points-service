@@ -70,3 +70,70 @@ jobs:
             -accrual-host=localhost \
             -accrual-port=$(random unused-port) \
             -accrual-database-uri="postgresql://postgres:postgres@postgres/praktikum?sslmode=disable"
+
+  integration-tests:
+    # Этот job запускает интеграционные тесты с использованием testcontainers
+    # testcontainers требует Docker для создания изолированных контейнеров с БД
+    # Поэтому мы используем ubuntu-latest runner, который имеет встроенную поддержку Docker
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Шаг 1: Получение кода из репозитория
+      # actions/checkout@v2 - это стандартный action GitHub, который клонирует репозиторий
+      # в рабочую директорию runner'а. Без этого шага у нас не будет доступа к исходному коду
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Шаг 2: Установка Go
+      # actions/setup-go@v4 устанавливает указанную версию Go на runner
+      # Это необходимо, так как на чистом ubuntu-latest нет предустановленного Go
+      # Мы указываем версию '1.24', которая соответствует версии в go.mod
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      # Шаг 3: Кэширование Go модулей
+      # Это оптимизация производительности - мы сохраняем загруженные зависимости
+      # в кэш GitHub Actions, чтобы не скачивать их заново при каждом запуске
+      # Ключ кэша основан на хэше go.sum, поэтому при изменении зависимостей
+      # кэш автоматически обновится
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          # Путь, где Go хранит загруженные модули
+          path: ~/go/pkg/mod
+          # Уникальный ключ кэша, основанный на ОС и содержимом go.sum
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          # Если точный ключ не найден, используем частичное совпадение
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # Шаг 4: Загрузка зависимостей
+      # go mod download загружает все зависимости, указанные в go.mod
+      # Если кэш был восстановлен, этот шаг будет очень быстрым
+      # Если нет - зависимости будут загружены из интернета
+      - name: Download dependencies
+        run: go mod download
+
+      # Шаг 5: Запуск интеграционных тестов
+      # Здесь происходит магия testcontainers:
+      # 1. testcontainers автоматически определяет, что мы в CI окружении (GitHub Actions)
+      # 2. Он использует Docker, который доступен на ubuntu-latest runner по умолчанию
+      # 3. Для каждого теста создается изолированный PostgreSQL контейнер
+      # 4. Применяются миграции из папки migrations/gophermart
+      # 5. Запускаются тесты против реальной БД
+      # 6. После тестов контейнер автоматически удаляется
+      #
+      # Флаг -tags=integration говорит Go компилировать только файлы с build tag "integration"
+      # Это позволяет разделить unit-тесты (быстрые) и integration-тесты (медленные)
+      # Флаг -v включает verbose режим для детального вывода результатов
+      - name: Run integration tests
+        run: |
+          # Запускаем интеграционные тесты для gophermart postgres репозиториев
+          # Эти тесты проверяют работу с БД: создание, чтение, обновление, удаление данных
+          go test -tags=integration -v ./internal/gophermart/infrastructure/datastorage/postgres/...
+          
+          # Запускаем интеграционные тесты для user-service postgres репозиториев
+          # Эти тесты проверяют работу с таблицей users: создание пользователей, поиск по login
+          go test -tags=integration -v ./internal/user-service/infrastructure/datastorage/postgres/...
