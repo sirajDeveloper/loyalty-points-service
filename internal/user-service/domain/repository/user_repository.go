@@ -11,3 +11,4 @@ type UserRepository interface {
 	ExistsByLogin(ctx context.Context, login string) (bool, error)
 }
 
+

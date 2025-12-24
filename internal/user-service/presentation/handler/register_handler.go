@@ -2,9 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"net/http"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/user-service/application/usecase"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/user-service/domain/errors"
+	"log"
+	"net/http"
 )
 
 type RegisterHandler struct {
@@ -51,6 +52,7 @@ func (h *RegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		log.Printf("register error: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -58,6 +60,7 @@ func (h *RegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Authorization", "Bearer "+resp.Token)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"token": resp.Token})
+	if err := json.NewEncoder(w).Encode(map[string]string{"token": resp.Token}); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }
-

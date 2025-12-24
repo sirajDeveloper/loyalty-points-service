@@ -2,20 +2,21 @@ package usecase
 
 import (
 	"context"
-	"golang.org/x/crypto/bcrypt"
+
 	"github.com/sirajDeveloper/loyalty-points-service/internal/user-service/domain/errors"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/user-service/domain/repository"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/user-service/domain/service"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type LoginUseCase struct {
-	userRepo  repository.UserRepository
+	userRepo   repository.UserRepository
 	jwtService service.JWTService
 }
 
 func NewLoginUseCase(userRepo repository.UserRepository, jwtService service.JWTService) *LoginUseCase {
 	return &LoginUseCase{
-		userRepo:  userRepo,
+		userRepo:   userRepo,
 		jwtService: jwtService,
 	}
 }
@@ -54,4 +55,3 @@ func (uc *LoginUseCase) Execute(ctx context.Context, req LoginRequest) (*LoginRe
 
 	return &LoginResponse{Token: token}, nil
 }
-
