@@ -29,19 +29,19 @@ type transaction struct {
 }
 
 func (t *transaction) OrderRepository() repository.OrderRepository {
-	return &orderRepositoryTx{tx: t.tx}
+	return NewOrderRepositoryTx(t.tx)
 }
 
 func (t *transaction) OutboxRepository() repository.OutboxRepository {
-	return &outboxRepositoryTx{tx: t.tx}
+	return NewOutboxRepositoryTx(t.tx)
 }
 
 func (t *transaction) WithdrawalRepository() repository.WithdrawalRepository {
-	return &withdrawalRepositoryTx{tx: t.tx}
+	return NewWithdrawalRepositoryTx(t.tx)
 }
 
 func (t *transaction) BalanceRepository() repository.BalanceRepository {
-	return &balanceRepositoryTx{tx: t.tx}
+	return NewBalanceRepositoryTx(t.tx)
 }
 
 func (t *transaction) Commit(ctx context.Context) error {

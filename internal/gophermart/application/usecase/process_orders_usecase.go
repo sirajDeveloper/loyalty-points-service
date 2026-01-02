@@ -3,8 +3,10 @@ package usecase
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/model"
 	"github.com/sirajDeveloper/loyalty-points-service/internal/gophermart/domain/repository"
@@ -33,36 +35,87 @@ func NewProcessOrdersUseCase(
 }
 
 const (
-	maxRetries = 3
-	batchSize  = 10
+	maxRetries     = 3
+	batchSize      = 10
+	maxConcurrency = 5
 )
 
 func (uc *ProcessOrdersUseCase) ProcessPendingOrders(ctx context.Context) error {
 	outboxes, err := uc.outboxRepo.FindPending(ctx, batchSize)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to find pending outboxes", "error", err)
 		return err
 	}
 
-	for _, outbox := range outboxes {
-		if err := uc.processOrder(ctx, outbox); err != nil {
-			log.Printf("failed to process order %d: %v", outbox.OrderID, err)
-			if outbox.Retries >= maxRetries {
-				if err := uc.outboxRepo.UpdateStatus(ctx, outbox.ID, model.OutboxStatusFailed); err != nil {
-					log.Printf("failed to update outbox status to failed: %v", err)
-				}
-			} else {
-				if err := uc.outboxRepo.IncrementRetries(ctx, outbox.ID); err != nil {
-					log.Printf("failed to increment retries: %v", err)
-				}
-			}
-			continue
-		}
-
-		if err := uc.outboxRepo.UpdateStatus(ctx, outbox.ID, model.OutboxStatusProcessed); err != nil {
-			log.Printf("failed to update outbox status to processed: %v", err)
-		}
+	if len(outboxes) == 0 {
+		return nil
 	}
 
+	slog.InfoContext(ctx, "processing pending orders", "count", len(outboxes))
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	sem := make(chan struct{}, maxConcurrency)
+
+	for _, outbox := range outboxes {
+		outbox := outbox
+
+		g.Go(func() error {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if err := uc.processOrder(gCtx, outbox); err != nil {
+				slog.WarnContext(gCtx, "failed to process order",
+					"order_id", outbox.OrderID,
+					"outbox_id", outbox.ID,
+					"retries", outbox.Retries,
+					"error", err,
+				)
+
+				if outbox.Retries >= maxRetries {
+					if updateErr := uc.outboxRepo.UpdateStatus(gCtx, outbox.ID, model.OutboxStatusFailed); updateErr != nil {
+						slog.ErrorContext(gCtx, "failed to update outbox status to failed",
+							"outbox_id", outbox.ID,
+							"error", updateErr,
+						)
+					} else {
+						slog.InfoContext(gCtx, "outbox marked as failed",
+							"outbox_id", outbox.ID,
+							"retries", outbox.Retries,
+						)
+					}
+				} else {
+					if updateErr := uc.outboxRepo.IncrementRetries(gCtx, outbox.ID); updateErr != nil {
+						slog.ErrorContext(gCtx, "failed to increment retries",
+							"outbox_id", outbox.ID,
+							"error", updateErr,
+						)
+					}
+				}
+				return nil
+			}
+
+			if err := uc.outboxRepo.UpdateStatus(gCtx, outbox.ID, model.OutboxStatusProcessed); err != nil {
+				slog.ErrorContext(gCtx, "failed to update outbox status to processed",
+					"outbox_id", outbox.ID,
+					"error", err,
+				)
+			} else {
+				slog.InfoContext(gCtx, "order processed successfully",
+					"order_id", outbox.OrderID,
+					"outbox_id", outbox.ID,
+				)
+			}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		slog.ErrorContext(ctx, "error in order processing group", "error", err)
+		return err
+	}
+
+	slog.InfoContext(ctx, "finished processing pending orders", "count", len(outboxes))
 	return nil
 }
 
@@ -126,13 +179,16 @@ func (uc *ProcessOrdersUseCase) StartWorker(ctx context.Context, interval time.D
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	slog.InfoContext(ctx, "order processing worker started", "interval", interval)
+
 	for {
 		select {
 		case <-ctx.Done():
+			slog.InfoContext(ctx, "order processing worker stopped")
 			return
 		case <-ticker.C:
 			if err := uc.ProcessPendingOrders(ctx); err != nil {
-				log.Printf("error processing pending orders: %v", err)
+				slog.ErrorContext(ctx, "error processing pending orders", "error", err)
 			}
 		}
 	}
