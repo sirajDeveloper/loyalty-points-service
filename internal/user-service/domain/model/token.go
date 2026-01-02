@@ -7,3 +7,4 @@ type Claims struct {
 	Login  string
 	jwt.RegisteredClaims
 }
+
